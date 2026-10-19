@@ -2,9 +2,10 @@ import AppKit
 import SwiftUI
 
 enum RadialGeometry {
-    static let size: CGFloat = 380
-    static let inner: CGFloat = 62
+    static let size: CGFloat = 400
+    static let inner: CGFloat = 64
     static let outer: CGFloat = 160
+    static let discRadius: CGFloat = 172
 
     /// Center angle of a segment in degrees, SwiftUI convention (0° = right, clockwise, first segment on top).
     static func angle(of index: Int, count: Int) -> Double {
@@ -18,7 +19,7 @@ enum RadialGeometry {
         let dx = point.x - center
         let dy = center - point.y
         let radius = hypot(dx, dy)
-        guard radius > inner, radius < outer + 18 else { return nil }
+        guard radius > inner, radius < discRadius + 12 else { return nil }
         let span = 360 / Double(count)
         var degrees = atan2(Double(dy), Double(dx)) * 180 / .pi + 90 + span / 2
         degrees = degrees.truncatingRemainder(dividingBy: 360)
@@ -27,11 +28,25 @@ enum RadialGeometry {
     }
 }
 
+struct ActionPage: Equatable {
+    let title: String
+    let actions: [FileAction]
+}
+
 final class RadialModel: ObservableObject {
-    @Published var actions: [FileAction] = []
+    @Published var pages: [ActionPage] = []
+    @Published var page = 0
     @Published var hovered: Int?
     @Published var visible = false
     @Published var summary = ""
+
+    var actions: [FileAction] {
+        pages.indices.contains(page) ? pages[page].actions : []
+    }
+
+    var nextPageTitle: String? {
+        pages.count > 1 ? pages[(page + 1) % pages.count].title : nil
+    }
 }
 
 @MainActor
@@ -40,6 +55,7 @@ final class RadialPanelController {
     private let panel: NSPanel
     private var files: [URL] = []
     private var generation = 0
+    private var lastDragPoint: NSPoint?
 
     init() {
         let size = RadialGeometry.size
@@ -66,6 +82,8 @@ final class RadialPanelController {
         dropView.controller = self
     }
 
+    var isShowing: Bool { panel.isVisible && model.visible }
+
     static func fileURLs(in pasteboard: NSPasteboard) -> [URL] {
         let objects = pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true])
         return (objects as? [URL]) ?? []
@@ -81,10 +99,19 @@ final class RadialPanelController {
             origin.y = min(max(origin.y, bounds.minY), bounds.maxY - size)
         }
         generation += 1
+        lastDragPoint = nil
         panel.setFrameOrigin(origin)
         model.hovered = nil
         panel.orderFrontRegardless()
         model.visible = true
+    }
+
+    /// Cycles Tools → Convert → Share (triggered by tapping the trigger key again mid-drag).
+    func nextPage() {
+        guard isShowing, model.pages.count > 1 else { return }
+        model.page = (model.page + 1) % model.pages.count
+        model.hovered = lastDragPoint.flatMap { RadialGeometry.segment(at: $0, count: model.actions.count) }
+        NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
     }
 
     func dragDidEnd() {
@@ -98,7 +125,7 @@ final class RadialPanelController {
         generation += 1
         let current = generation
         Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 180_000_000)
+            try? await Task.sleep(nanoseconds: 220_000_000)
             guard let self, self.generation == current else { return }
             self.panel.orderOut(nil)
             self.files = []
@@ -107,16 +134,16 @@ final class RadialPanelController {
 
     private func configure(with files: [URL]) {
         self.files = files
-        let kind = FileKind.common(files)
-        model.actions = kind.actions(for: files)
+        model.pages = FileKind.common(files).pages(for: files)
+        model.page = 0
         model.summary = Self.summary(for: files)
     }
 
     private static func summary(for files: [URL]) -> String {
-        if files.count > 1 { return "\(files.count) files" }
+        if files.count > 1 { return "\(files.count) FILES" }
         guard let url = files.first else { return "" }
         let values = try? url.resourceValues(forKeys: [.fileSizeKey, .isDirectoryKey])
-        if values?.isDirectory == true { return "Folder" }
+        if values?.isDirectory == true { return "FOLDER" }
         let bytes = Int64(values?.fileSize ?? 0)
         return ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
     }
@@ -128,12 +155,19 @@ final class RadialPanelController {
             let urls = Self.fileURLs(in: pasteboard)
             if !urls.isEmpty { configure(with: urls) }
         }
+        lastDragPoint = point
         let index = RadialGeometry.segment(at: point, count: model.actions.count)
-        if model.hovered != index { model.hovered = index }
+        if model.hovered != index {
+            model.hovered = index
+            if index != nil {
+                NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+            }
+        }
         return index == nil ? [] : .copy
     }
 
     func dragExited() {
+        lastDragPoint = nil
         model.hovered = nil
     }
 

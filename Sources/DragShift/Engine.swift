@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import CoreText
 import PDFKit
 import UniformTypeIdentifiers
@@ -19,10 +20,54 @@ enum EngineError: LocalizedError {
 
 /// Non-interactive conversions. Every function writes next to the source and returns the new files.
 enum Engine {
-    static func perform(_ action: FileAction, on url: URL) throws -> [URL] {
+    static func perform(_ action: FileAction, files: [URL]) throws -> [URL] {
+        switch action {
+        case .pdfMerge:
+            return [try PDFTools.merge(files)]
+        case .imagesToPDF:
+            return [try PDFTools.fromImages(files)]
+        default:
+            return try files.flatMap { try perform(action, on: $0) }
+        }
+    }
+
+    /// Plain text of any supported file: PDF text layer (or OCR), OCR for images, document text.
+    static func extractText(from url: URL) throws -> String {
+        switch FileKind.of(url) {
+        case .pdf:
+            return try PDFTools.text(url)
+        case .image:
+            guard let image = ImageIOHelper.load(url) else { throw EngineError.unreadable(url.lastPathComponent) }
+            return try VisionTools.text(in: image)
+        default:
+            return try TextConverter.load(url).string
+        }
+    }
+
+    private static func perform(_ action: FileAction, on url: URL) throws -> [URL] {
         switch action {
         case .pdfTo(let format):
             return try PDFConverter.convert(url, to: format)
+        case .pdfCompress:
+            return [try PDFTools.compress(url)]
+        case .pdfSplit:
+            return try PDFTools.split(url)
+        case .pdfRotate:
+            return [try PDFTools.rotate(url)]
+        case .removeBackground:
+            guard #available(macOS 14.0, *) else { throw EngineError.toolFailed("Remove BG needs macOS 14 or later.") }
+            guard let image = ImageIOHelper.load(url) else { throw EngineError.unreadable(url.lastPathComponent) }
+            let output = outputURL(next: url, suffix: "No BG", ext: "png")
+            try ImageIOHelper.write(try VisionTools.removeBackground(image), to: output, type: .png)
+            return [output]
+        case .videoMP4:
+            return [try VideoTools.export(url, preset: AVAssetExportPresetHighestQuality, fileType: .mp4, suffix: nil, ext: "mp4")]
+        case .video720:
+            return [try VideoTools.export(url, preset: AVAssetExportPreset1280x720, fileType: .mp4, suffix: "720p", ext: "mp4")]
+        case .videoAudio:
+            return [try VideoTools.export(url, preset: AVAssetExportPresetAppleM4A, fileType: .m4a, suffix: nil, ext: "m4a")]
+        case .videoGIF:
+            return [try VideoTools.gif(url)]
         case .textTo(let format):
             return [try TextConverter.convert(url, to: format)]
         case .compress:
@@ -38,8 +83,7 @@ enum Engine {
             try ImageIOHelper.write(image, to: output, type: type, quality: 0.95)
             return [output]
         case .convertImage(let format):
-            guard let image = ImageIOHelper.load(url) else { throw EngineError.unreadable(url.lastPathComponent) }
-            let type: UTType = format == .png ? .png : .jpeg
+            guard let image = ImageIOHelper.load(url), let type = format.utType else { throw EngineError.unreadable(url.lastPathComponent) }
             let output = outputURL(next: url, suffix: nil, ext: format.rawValue)
             try ImageIOHelper.write(image, to: output, type: type)
             return [output]
@@ -51,7 +95,8 @@ enum Engine {
             let output = outputURL(next: url, suffix: "copy", ext: url.pathExtension)
             try FileManager.default.copyItem(at: url, to: output)
             return [output]
-        case .crop, .addBackground, .adjust, .annotate, .redact, .copyPath:
+        case .pdfMerge, .imagesToPDF, .pdfProtect, .crop, .addBackground, .adjust, .annotate, .redact,
+             .copyText, .airDrop, .copyPath:
             return []
         }
     }

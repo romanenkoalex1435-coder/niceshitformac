@@ -63,8 +63,9 @@ struct EditorScaffold<Canvas: View, Controls: View>: View {
 struct WarmBackground: View {
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Color(hex: 0xFFE9D9), Color(hex: 0xFFCFB0)], startPoint: .top, endPoint: .bottom)
-            RadialGradient(colors: [Color(hex: 0xFFB27A, opacity: 0.45), .clear], center: .topTrailing, startRadius: 10, endRadius: 520)
+            // Translucent so the window's glass/blur shows through.
+            LinearGradient(colors: [Color(hex: 0xFFE9D9, opacity: 0.55), Color(hex: 0xFFCFB0, opacity: 0.45)], startPoint: .top, endPoint: .bottom)
+            RadialGradient(colors: [Color(hex: 0xFFB27A, opacity: 0.35), .clear], center: .topTrailing, startRadius: 10, endRadius: 520)
         }
         .ignoresSafeArea()
     }
@@ -138,6 +139,7 @@ struct SliderRow: View {
     let title: String
     @Binding var value: Double
     let range: ClosedRange<Double>
+    var valueText: ((Double) -> String)? = nil
 
     var body: some View {
         HStack(spacing: 10) {
@@ -147,6 +149,16 @@ struct SliderRow: View {
                 .frame(width: 78, alignment: .leading)
             Slider(value: $value, in: range)
                 .tint(Color.accent)
+            if let valueText {
+                Text(valueText(value))
+                    .font(.system(size: 11, weight: .medium).monospacedDigit())
+                    .foregroundStyle(Color.ink.opacity(0.6))
+                    .frame(width: 50, alignment: .trailing)
+            }
         }
     }
+}
+
+func signedText(_ value: Double) -> String {
+    String(format: "%+.2f", value)
 }

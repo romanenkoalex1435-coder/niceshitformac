@@ -14,6 +14,7 @@ final class DragMonitor: NSObject {
     private var baselineChangeCount = 0
     private var mouseWasDown = false
     private var shownForCurrentDrag = false
+    private var triggerWasDown = false
 
     func start() {
         baselineChangeCount = dragPasteboard.changeCount
@@ -36,9 +37,19 @@ final class DragMonitor: NSObject {
         }
         mouseWasDown = true
 
-        guard Prefs.enabled, !shownForCurrentDrag else { return }
+        let triggerDown = NSEvent.modifierFlags.contains(Prefs.trigger.flag)
+        defer { triggerWasDown = triggerDown }
+
+        if shownForCurrentDrag {
+            // Tapping the trigger key again flips to the next page of actions.
+            if triggerDown && !triggerWasDown {
+                panel.nextPage()
+            }
+            return
+        }
+
+        guard Prefs.enabled, triggerDown else { return }
         guard dragPasteboard.changeCount != baselineChangeCount else { return }
-        guard NSEvent.modifierFlags.contains(Prefs.trigger.flag) else { return }
 
         let files = RadialPanelController.fileURLs(in: dragPasteboard)
         guard !files.isEmpty else { return }

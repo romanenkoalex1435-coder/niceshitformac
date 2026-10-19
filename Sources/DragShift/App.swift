@@ -35,6 +35,15 @@ enum TriggerKey: String, CaseIterable, Identifiable {
         }
     }
 
+    var symbol: String {
+        switch self {
+        case .shift: return "⇧"
+        case .option: return "⌥"
+        case .control: return "⌃"
+        case .command: return "⌘"
+        }
+    }
+
     var flag: NSEvent.ModifierFlags {
         switch self {
         case .shift: return .shift
@@ -86,12 +95,14 @@ struct MenuContent: View {
         alert.messageText = "DragShift"
         alert.informativeText = """
         Start dragging any file (from Finder or the Desktop) and hold \(trigger.title). \
-        A radial menu appears under the cursor — drop the file on an action.
+        A radial menu appears under the cursor — drop the file on an action. \
+        Tap \(trigger.symbol) again while dragging to switch pages.
 
-        PDF → DOCX, JPG, PNG, TXT
-        Images → Compress, Metadata, Edit, Annotate, Add BG, Convert, Crop, Redact
-        Documents → PDF, DOCX, TXT, RTF
-        Anything else → ZIP, Duplicate, Copy Path
+        Images → Tools (Compress, Metadata, Edit, Annotate, Add BG, Remove BG, Crop, Redact) · Convert (PNG, JPG, HEIC, WEBP, TIFF, AVIF, PDF, Text)
+        PDF → Convert (DOCX, JPG, PNG, TXT) · Tools (Compress, Split/Merge, Rotate, Lock, Text)
+        Documents → PDF, DOCX, TXT, RTF, Text
+        Video → MP4, 720p, GIF, Audio
+        Every file → Share (AirDrop, Path, ZIP, Duplicate)
 
         Results are saved next to the original file.
         """

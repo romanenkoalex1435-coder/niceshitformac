@@ -69,12 +69,12 @@ struct AdjustEditor: View {
             }
         } controls: {
             VStack(alignment: .leading, spacing: 8) {
-                SliderRow(title: "Exposure", value: $adjustments.exposure, range: -1.5...1.5)
-                SliderRow(title: "Brightness", value: $adjustments.brightness, range: -0.4...0.4)
-                SliderRow(title: "Contrast", value: $adjustments.contrast, range: 0.5...1.5)
-                SliderRow(title: "Saturation", value: $adjustments.saturation, range: 0...2)
-                SliderRow(title: "Vibrance", value: $adjustments.vibrance, range: -1...1)
-                SliderRow(title: "Sharpness", value: $adjustments.sharpness, range: 0...2)
+                SliderRow(title: "Exposure", value: $adjustments.exposure, range: -1.5...1.5, valueText: signedText)
+                SliderRow(title: "Brightness", value: $adjustments.brightness, range: -0.4...0.4, valueText: signedText)
+                SliderRow(title: "Contrast", value: $adjustments.contrast, range: 0.5...1.5, valueText: { signedText($0 - 1) })
+                SliderRow(title: "Saturation", value: $adjustments.saturation, range: 0...2, valueText: { signedText($0 - 1) })
+                SliderRow(title: "Vibrance", value: $adjustments.vibrance, range: -1...1, valueText: signedText)
+                SliderRow(title: "Sharpness", value: $adjustments.sharpness, range: 0...2, valueText: signedText)
                 HStack(spacing: 6) {
                     ToolChip(title: "Rotate", symbol: "rotate.right", selected: false) {
                         adjustments.quarterTurns = (adjustments.quarterTurns + 1) % 4
