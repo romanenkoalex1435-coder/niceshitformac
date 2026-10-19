@@ -9,7 +9,11 @@ enum PDFTools {
     static func compress(_ url: URL) throws -> URL {
         let document = try open(url)
         let output = Engine.outputURL(next: url, suffix: "Compressed", ext: "pdf")
-        let options: [PDFDocumentWriteOption: Any] = [.saveImagesAsJPEGOption: true, .optimizeImagesForScreenOption: true]
+        var options: [PDFDocumentWriteOption: Any] = [:]
+        if #available(macOS 13.4, *) {
+            options[.saveImagesAsJPEGOption] = true
+            options[.optimizeImagesForScreenOption] = true
+        }
         guard document.write(to: output, withOptions: options) else { throw EngineError.writeFailed(output.lastPathComponent) }
         return output
     }

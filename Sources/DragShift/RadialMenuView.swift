@@ -165,7 +165,7 @@ struct RoundedSector: Shape {
         let sb = Double(asin(d / b))
         let sa = Double(asin(d / a))
         func point(_ angle: Double, _ radius: CGFloat) -> CGPoint {
-            CGPoint(x: center.x + cos(angle) * radius, y: center.y + sin(angle) * radius)
+            CGPoint(x: center.x + CGFloat(cos(angle)) * radius, y: center.y + CGFloat(sin(angle)) * radius)
         }
         let e1 = point(p1 + sb, b)
         let e2 = point(p2 - sb, b)
